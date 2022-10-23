@@ -1,3 +1,6 @@
+import asyncio
+
+
 def inputLineBreak(text):
     if PRINT_QUESTIONS:
         return input(f'{text}\n')
@@ -26,15 +29,21 @@ def validateState(state_to_validation):
     ifNotContainsRaiseException(states, state_to_validation)
 
 
-def go_through(first_state, word_remaining):
+async def go_through(first_state, word_remaining, final_states):
     current_state = first_state
 
     for index, symbol in enumerate(word_remaining):
+        if await processEmptyWord(symbol, current_state, word_remaining[index + 1:], final_states):
+            current_state = ERROR_STATE
+            break
+
         try:
             next_states = states[current_state][symbol]
             if len(next_states) > 1:
                 for next_state in next_states:
-                    go_through(next_state, word_remaining[index + 1:])
+                    await go_through(next_state, word_remaining[index + 1:], final_states)
+                    current_state = ERROR_STATE
+                break
             else:
                 current_state = next_states[0]
         except:
@@ -45,7 +54,24 @@ def go_through(first_state, word_remaining):
         final_states.append(current_state)
 
 
+async def processEmptyWord(symbol, current_state, word_remaining, final_states):
+    try:
+        if symbol is EMPTY_WORD:
+            raise Exception()
+
+        next_states = states[current_state][EMPTY_WORD]
+
+        for next_state in next_states:
+            await go_through(next_state, word_remaining, final_states)
+
+        return True
+    except:
+        return False
+
+
+
 ERROR_STATE = 'ERROR'
+EMPTY_WORD = '*'
 PRINT_QUESTIONS = False
 
 states_aux = inputLineBreak("Digite os estados")
@@ -82,19 +108,23 @@ for end_state in end_states:
 
 words = inputLineBreak("Digite as palavras").split()
 
-final_states = []
+# final_states = []
 
-for word in words:
-    final_states = []
-    go_through(start_state, word)
 
-    accept = False
-    for final_state in final_states:
-        if any(state for state in end_states if state == final_state):
-            accept = True
-            break
+async def main():
+    for word in words:
+        final_states = []
+        await go_through(start_state, word, final_states)
 
-    if accept:
-        printYes()
-    else:
-        printNot()
+        accept = False
+        for final_state in final_states:
+            if any(state for state in end_states if state == final_state):
+                accept = True
+                break
+
+        if accept:
+            printYes()
+        else:
+            printNot()
+
+asyncio.run(main())
